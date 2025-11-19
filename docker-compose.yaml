@@ -1,0 +1,88 @@
+services:
+  bff_service:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile
+    ports:
+      - "${BFF_SERVICE_PORT:-8000}:${BFF_SERVICE_PORT:-8000}"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${BFF_SERVICE_PORT:-8000}"]
+    environment:
+      - RABBITMQ_USER=${RABBITMQ_USER:-user}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-password}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - ARTICLE_QUEUE_NAME=${ARTICLE_QUEUE_NAME:-article_queue}
+      - HABR_ADAPTER_BASE_URL=${HABR_ADAPTER_BASE_URL:-http://habr-adapter:5000}
+      - LLM_SERVICE_BASE_URL=${LLM_SERVICE_BASE_URL:-http://llm-service:5001}
+
+  habr-adapter:
+    build:
+      context: ./habr_adapter
+      dockerfile: Dockerfile
+    ports:
+      - "${HABR_ADAPTER_SERVICE_PORT:-5000}:${HABR_ADAPTER_SERVICE_PORT:-5000}"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${HABR_ADAPTER_SERVICE_PORT:-5000}"]
+
+  llm-service:
+    build:
+      context: ./llm_service
+      dockerfile: Dockerfile
+    ports:
+      - "${LLM_SERVICE_PORT:-5001}:${LLM_SERVICE_PORT:-5001}"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${LLM_SERVICE_PORT:-5001}"]
+    environment:
+      - RABBITMQ_USER=${RABBITMQ_USER:-user}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-password}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+
+  llm-consumer:
+    build:
+      context: ./llm_service
+      dockerfile: Dockerfile
+    command: ["python", "consumer.py"]
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_USER=${RABBITMQ_USER:-user}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-password}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: order_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"  # для подключения приложений
+      - "15672:15672" # для веб-интерфейса управления
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-password}
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
