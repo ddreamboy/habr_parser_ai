@@ -14,7 +14,6 @@ async def register_user(
     auth_service: AuthServiceProxy = Depends(get_auth_service_proxy),
 ) -> dict:
     """Регистрация нового пользователя"""
-    logger.debug(f"Registering user with data: {user_data}")
     try:
         result = await auth_service.register_user(user_data)
         logger.debug("User registered successfully")
@@ -31,7 +30,6 @@ async def login_user(
     auth_service: AuthServiceProxy = Depends(get_auth_service_proxy),
 ) -> dict:
     """Авторизация пользователя"""
-    logger.debug(f"Login attempt for phone: {user_data.phone_number}")
     try:
         # Получаем полный response от auth_service с cookies
         auth_response = await auth_service.login_user(user_data)
