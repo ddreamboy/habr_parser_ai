@@ -4,5 +4,9 @@ loguru
 httpx
 pydantic-settings
 pydantic
+pydantic[email]
 aio-pika
 beautifulsoup4
+sqlalchemy
+asyncpg
+redis

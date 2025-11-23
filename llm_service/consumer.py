@@ -104,7 +104,18 @@ async def process_message(message: AbstractIncomingMessage):
 
 
 async def consume():
-    connection = await connect_robust(settings.RABBITMQ_URL)
+    connection = None
+    while True:
+        try:
+            connection = await connect_robust(settings.RABBITMQ_URL)
+            logger.info("Успешное подключение к RabbitMQ")
+            break
+        except Exception as e:
+            logger.warning(
+                f"Не удалось подключиться к RabbitMQ, повторная попытка через 5 секунд: {e}"
+            )
+            await asyncio.sleep(5)
+
     channel = await connection.channel()
     queue = await channel.declare_queue(
         settings.ARTICLE_QUEUE_NAME,
