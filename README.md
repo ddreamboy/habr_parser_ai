@@ -48,27 +48,45 @@ sequenceDiagram
     participant User
     participant BFF as BFF Service
     participant Auth as Auth Service
+    participant DB as PostgreSQL
+    participant Redis
     participant Habr as Habr Adapter
     participant RMQ as RabbitMQ
     participant Worker as LLM Consumer
-    participant Redis
     participant Gemini as Gemini API
     participant LLMAPI as LLM Service API
 
+    Note over User, BFF: 1. Отправка статьи на обработку
     User->>BFF: POST /api/articles/process
     activate BFF
-    BFF->>Auth: Validate Token
-    activate Auth
-    Auth-->>BFF: User Info
-    deactivate Auth
-    BFF->>Habr: Parse Article
-    activate Habr
-    Habr-->>BFF: Article Content
-    deactivate Habr
-    BFF->>RMQ: Publish Task (task_id)
+    
+    rect rgb(240, 248, 255)
+    Note right of BFF: Auth & Cache Check
+    BFF->>Redis: Check Token
+    opt Token not cached
+        BFF->>Auth: Validate Token
+        Auth-->>BFF: User Info
+        BFF->>Redis: Cache Token
+    end
+    end
+
+    BFF->>DB: Check Article Exists
+    
+    alt Article New
+        BFF->>Habr: Parse Article
+        activate Habr
+        Habr-->>BFF: Article Content
+        deactivate Habr
+        BFF->>RMQ: Publish Task
+        BFF->>DB: Save Article
+    end
+    
+    BFF->>DB: Link User to Article
+    BFF->>Redis: Check Result Cache
     BFF-->>User: Return task_id
     deactivate BFF
 
+    Note over RMQ, Gemini: 2. Асинхронная обработка
     loop Async Processing
         Worker->>RMQ: Consume Task
         activate Worker
@@ -81,21 +99,30 @@ sequenceDiagram
         deactivate Worker
     end
 
+    Note over User, BFF: 3. Получение результата
     User->>BFF: GET /api/articles/result/{task_id}
     activate BFF
-    BFF->>Auth: Validate Token
-    activate Auth
-    Auth-->>BFF: User Info
-    deactivate Auth
-    BFF->>LLMAPI: GET /api/gemini/tasks/{task_id}
-    activate LLMAPI
-    LLMAPI->>Redis: Get Result
-    activate Redis
-    Redis-->>LLMAPI: Result JSON
-    deactivate Redis
-    LLMAPI-->>BFF: Result JSON
-    deactivate LLMAPI
-    BFF-->>User: Result JSON
+    
+    BFF->>DB: Get Article
+    
+    alt Result in DB
+        BFF->>Redis: Cache Result
+        BFF-->>User: Result JSON
+    else Result not in DB
+        BFF->>LLMAPI: GET /api/gemini/tasks/{task_id}
+        activate LLMAPI
+        LLMAPI->>Redis: Get Result
+        Redis-->>LLMAPI: Result JSON
+        LLMAPI-->>BFF: Result JSON
+        deactivate LLMAPI
+        
+        opt Status Done
+            BFF->>DB: Save Result
+            BFF->>Redis: Cache Result
+        end
+        
+        BFF-->>User: Result JSON
+    end
     deactivate BFF
 ```
 
