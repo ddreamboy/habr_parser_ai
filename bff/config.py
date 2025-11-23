@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     HABR_ADAPTER_BASE_URL: str = "http://habr-adapter:5000"
     LLM_SERVICE_BASE_URL: str = "http://llm-service:5001"
-    AUTH_SERVICE_URL: str = "http://auth-service:5002"
+    AUTH_SERVICE_BASE_URL: str = "http://auth-service:5002"
 
     # Database
     POSTGRES_DB: str = "app_db"
