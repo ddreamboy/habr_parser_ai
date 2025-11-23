@@ -60,7 +60,7 @@ sequenceDiagram
     User->>BFF: POST /api/articles/process
     activate BFF
     
-    rect rgb(240, 248, 255)
+    rect rgb(0, 0, 0, 0)
     Note right of BFF: Auth & Cache Check
     BFF->>Redis: Check Token
     opt Token not cached
